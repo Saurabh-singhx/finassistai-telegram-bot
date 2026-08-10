@@ -91,12 +91,14 @@ This repository includes `render.yaml` for a single-instance Render web service.
 1. Create a new **Blueprint** from this repository in Render and fill in the secret
    environment variables. Generate `TELEGRAM_WEBHOOK_SECRET` with
    `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+   Set `ONE_TIME_PASSWORD` to the shared access password required for each new Telegram user.
 2. The app automatically derives its Telegram webhook URL from Render's public URL.
    Set `TELEGRAM_WEBHOOK_URL` only if you want Telegram to use a custom domain.
 3. Set `GOOGLE_REDIRECT_URI` to
    `https://<your-service>.onrender.com/auth/google/callback`, then add that exact URL
    to the Google OAuth client's authorized redirect URIs.
-4. Deploy. On startup, the app registers the Telegram webhook using the configured URL.
+4. Deploy. Render runs `alembic upgrade head` during the build, which adds any required
+   database columns, then the app registers the Telegram webhook at startup.
 
 Do not run a second deployment or local polling copy using the same Telegram bot token.
 Keep this Render service at one instance: the in-process scheduler and Telegram update
@@ -147,6 +149,7 @@ Use Alembic for schema changes in deployed environments. For a fresh development
 - The daily briefing scheduler polls eligible users once per minute. It is suitable for a modest user base; move to per-user jobs or a queue as usage grows.
 - OAuth access and refresh tokens are stored in the user record. Use encrypted storage/column encryption and restrict database access before production use.
 - Never commit `.env`, OAuth client secrets, bot tokens, or database credentials.
+- `ONE_TIME_PASSWORD` is required at startup. Each Telegram user must send it once; their verified access is then stored permanently in the database.
 - SEC EDGAR requires a descriptive `User-Agent` containing a real contact address.
 - Market data availability depends on the entitlements of the configured provider keys.
 

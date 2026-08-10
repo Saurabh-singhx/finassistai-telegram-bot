@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     TELEGRAM_WEBHOOK_URL: str | None = None
     # A high-entropy value Telegram sends in the webhook request header.
     TELEGRAM_WEBHOOK_SECRET: str | None = None
+    # Private-access password required once per Telegram user.
+    ONE_TIME_PASSWORD: str | None = None
 
     # LLM
     GOOGLE_API_KEY: str

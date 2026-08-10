@@ -3,7 +3,8 @@ services:
     name: finassist-bot
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    # Free Render services do not support preDeployCommand, so migrate during build.
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     numInstances: 1
@@ -17,6 +18,8 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: ONE_TIME_PASSWORD
         sync: false
       - key: GOOGLE_API_KEY
         sync: false

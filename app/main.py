@@ -42,6 +42,11 @@ def _validate_webhook_settings() -> str:
     return webhook_url
 
 
+def _validate_access_settings() -> None:
+    if not settings.ONE_TIME_PASSWORD:
+        raise RuntimeError("ONE_TIME_PASSWORD must be configured.")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global telegram_app
@@ -49,6 +54,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up %s (%s)...", settings.APP_NAME, settings.ENV)
     try:
         webhook_url = _validate_webhook_settings()
+        _validate_access_settings()
         await init_db()
 
         telegram_app = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
