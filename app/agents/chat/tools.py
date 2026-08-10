@@ -6,7 +6,7 @@ from app.models.GoogleOAuthState import GoogleOAuthState
 from app.services.google_oauth import get_authorization_url
 from app.services.market_data import finnhub_client, fred_client, sec_edgar
 from app.services.rag_service import search_similar
-from app.services.telegram_service import update_status,delete_status
+from app.services.telegram_service import update_status
 
 
 def build_chat_tools(db, user_id: str, chat_id: int, status_message_id: int):

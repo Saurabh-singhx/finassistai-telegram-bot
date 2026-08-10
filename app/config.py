@@ -14,6 +14,11 @@ class Settings(BaseSettings):
 
     # Telegram
     TELEGRAM_BOT_TOKEN: str
+    # Public HTTPS endpoint registered with Telegram, for example:
+    # https://finassist.onrender.com/telegram/webhook
+    TELEGRAM_WEBHOOK_URL: str | None = None
+    # A high-entropy value Telegram sends in the webhook request header.
+    TELEGRAM_WEBHOOK_SECRET: str | None = None
 
     # LLM
     GOOGLE_API_KEY: str

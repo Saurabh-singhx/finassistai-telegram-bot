@@ -39,7 +39,7 @@ Telegram
    └── Google OAuth ────────────── Gmail + Google Calendar
 ```
 
-The application is a FastAPI service that runs the Telegram bot and scheduler in its lifespan. LangGraph coordinates chat and briefing flows; Postgres stores users, preferences, messages, OAuth state, and document embeddings.
+The application is a FastAPI service that receives Telegram updates through a signed webhook and runs the scheduler in its lifespan. LangGraph coordinates chat and briefing flows; Postgres stores users, preferences, messages, OAuth state, and document embeddings.
 
 ## Getting started
 
@@ -83,6 +83,24 @@ uvicorn app.main:app --reload
 ```
 
 Health check: `GET /health`
+
+### Deploy to Render
+
+This repository includes `render.yaml` for a single-instance Render web service.
+
+1. Create a new **Blueprint** from this repository in Render and fill in the secret
+   environment variables. Generate `TELEGRAM_WEBHOOK_SECRET` with
+   `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+2. The app automatically derives its Telegram webhook URL from Render's public URL.
+   Set `TELEGRAM_WEBHOOK_URL` only if you want Telegram to use a custom domain.
+3. Set `GOOGLE_REDIRECT_URI` to
+   `https://<your-service>.onrender.com/auth/google/callback`, then add that exact URL
+   to the Google OAuth client's authorized redirect URIs.
+4. Deploy. On startup, the app registers the Telegram webhook using the configured URL.
+
+Do not run a second deployment or local polling copy using the same Telegram bot token.
+Keep this Render service at one instance: the in-process scheduler and Telegram update
+queue are intentionally single-instance components.
 
 ### Google OAuth setup
 
