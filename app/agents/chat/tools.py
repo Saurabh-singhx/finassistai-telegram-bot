@@ -269,7 +269,7 @@ def build_chat_tools(
         )
 
     @tool
-    async def update_user_preferences(
+    async def update_tool_user_preferences(
         sectors: list[str] | None = None,
         followed_companies: list[str] | None = None,
         followed_markets: list[str] | None = None,
@@ -331,5 +331,5 @@ def build_chat_tools(
         search_my_documents,
         connect_google_account,
         get_user_preferences,
-        update_user_preferences,
+        update_tool_user_preferences,
     ]
