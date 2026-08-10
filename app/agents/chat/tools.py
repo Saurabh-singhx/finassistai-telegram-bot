@@ -339,7 +339,7 @@ def build_chat_tools(
         max_results: int = 10,
     ) -> list[dict[str, Any]]:
         """
-        Search and read the user's Gmail messages.
+        Search and read the user's Gmail messages if they are connected.
 
         Use Gmail search syntax in `query`, for example:
         - is:unread
@@ -373,7 +373,7 @@ def build_chat_tools(
         max_results: int = 20,
     ) -> list[dict[str, Any]]:
         """
-        Read the user's Google Calendar events.
+        Read the user's Google Calendar events if they are connected.
 
         `time_min` and `time_max` should be RFC3339 timestamps.
         Use them to restrict the search to a specific time range.
@@ -408,7 +408,7 @@ def build_chat_tools(
         attendees: list[str] | None = None,
     ) -> dict[str, Any]:
         """
-        Create an event in the user's primary Google Calendar.
+        Create an event in the user's primary Google Calendar if they are connected.
 
         `start` and `end` must contain either:
         - dateTime: RFC3339 timestamp for a timed event

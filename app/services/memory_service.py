@@ -1,6 +1,6 @@
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.models.user import User
 from app.models.memory import UserMemory
 from app.models.messages import Message
 
@@ -19,15 +19,56 @@ async def get_recent_messages(db: AsyncSession, user_id, limit: int = RECENT_MES
     return list(reversed(result.scalars().all()))
 
 
-async def get_user_context(db: AsyncSession, user_id) -> str:
-    """Renders long-term UserMemory facts into a short string injected into the chat system prompt.
-    This is the 'build context about the user over time' piece — distinct from the LangGraph
-    checkpointer, which only covers the current conversation thread."""
-    result = await db.execute(select(UserMemory).where(UserMemory.user_id == user_id).order_by(desc(UserMemory.importance)))
+async def get_user_context(
+    db: AsyncSession,
+    user_id,
+) -> str:
+    """Build long-term user context for the system prompt."""
+
+    # Get user profile / Google connection status
+    user_result = await db.execute(
+        select(User).where(User.id == user_id)
+    )
+    user = user_result.scalar_one_or_none()
+
+    # Get long-term memories
+    result = await db.execute(
+        select(UserMemory)
+        .where(UserMemory.user_id == user_id)
+        .order_by(desc(UserMemory.importance))
+    )
     memories = result.scalars().all()
-    if not memories:
+
+    context_parts = []
+
+    # Google connection status
+    if user:
+        google_connected = bool(
+            user.google_id and user.google_refresh_token
+        )
+
+        context_parts.append(
+            f"Google connected: {google_connected}"
+        )
+
+        if user.google_email:
+            context_parts.append(
+                f"Google email: {user.google_email}"
+            )
+
+    # Long-term memories
+    if memories:
+        context_parts.append(
+            "\n".join(
+                f"- {m.key}: {m.value}"
+                for m in memories[:15]
+            )
+        )
+
+    if not context_parts:
         return "Nothing yet — this may be an early conversation with this user."
-    return "\n".join(f"- {m.key}: {m.value}" for m in memories[:15])
+
+    return "\n".join(context_parts)
 
 
 async def upsert_memory(db: AsyncSession, user_id, key: str, value: str, importance: float = 0.5) -> None:

@@ -22,12 +22,21 @@ ACCESS_DENIED_PROMPT = "That password is not correct. Please try again."
 
 async def _get_or_create_user(db, update: Update) -> User:
     tg_user = update.effective_user
-    result = await db.execute(select(User).where(User.telegram_id == tg_user.id))
+
+    result = await db.execute(
+        select(User).where(User.telegram_id == tg_user.id)
+    )
     user = result.scalar_one_or_none()
+
     if not user:
-        user = User(telegram_id=tg_user.id, telegram_username=tg_user.username, display_name=tg_user.full_name)
+        user = User(
+            telegram_id=tg_user.id,
+            telegram_username=tg_user.username,
+            display_name=tg_user.full_name,
+        )
         db.add(user)
         await db.flush()
+
     return user
 
 
