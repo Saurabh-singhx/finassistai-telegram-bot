@@ -5,9 +5,10 @@ import base64
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
-
+from sqlalchemy import select
 from app.config import settings
-
+from app.database import AsyncSessionLocal
+from app.models.user import User
 
 GOOGLE_SCOPES = [
     "openid",
@@ -125,3 +126,41 @@ async def get_google_user_info(
         response.raise_for_status()
 
         return response.json()
+
+async def get_user_google_credentials(
+    telegram_id: int,
+) -> Credentials:
+    """
+    Get Google OAuth credentials for a Telegram user.
+
+    The user's access and refresh tokens are stored on the User model.
+    """
+
+    async with AsyncSessionLocal() as session:
+        user = await session.scalar(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+
+        if user is None:
+            raise ValueError("User not found.")
+
+        if not user.google_access_token:
+            raise ValueError(
+                "Google account is not connected. "
+                "Please connect your Google account first."
+            )
+
+        if not user.google_refresh_token:
+            raise ValueError(
+                "Google refresh token is missing. "
+                "Please reconnect your Google account."
+            )
+
+        return Credentials(
+            token=user.google_access_token,
+            refresh_token=user.google_refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=settings.GOOGLE_CLIENT_ID,
+            client_secret=settings.GOOGLE_CLIENT_SECRET,
+            scopes=user.google_scopes,
+        )
