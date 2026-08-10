@@ -11,7 +11,6 @@ Database logic belongs in repositories/services.
 
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
-
 from langchain_core.tools import tool
 
 from app.models.GoogleOAuthState import GoogleOAuthState
@@ -32,7 +31,16 @@ from app.repositories.user_preferences import (
 )
 
 from app.database import AsyncSessionLocal
+from typing import Any
 
+from langchain_core.tools import tool
+
+from app.services.google_oauth import get_user_google_credentials
+from app.services.google_service import (
+    read_gmail_messages,
+    list_calendar_events,
+    create_calendar_event,
+)
 
 def build_chat_tools(
     db,
@@ -262,7 +270,11 @@ def build_chat_tools(
     @tool
     async def get_user_preferences() -> dict:
         """Get the current user's financial preferences and active watchlist."""
-
+        await update_status(
+                chat_id,
+                status_message_id,
+                f"📊 Fetching user preferences...",
+            )
         return await get_user_financial_preferences(
             db,
             user_uuid,
@@ -289,7 +301,11 @@ def build_chat_tools(
 
         remove_watchlist contains the symbol/company/topic to remove.
         """
-
+        await update_status(
+            chat_id,
+            status_message_id,
+            f"📊 Updating user preferences...",
+        )
         await update_user_preferences(
             db,
             user_uuid,
@@ -316,6 +332,107 @@ def build_chat_tools(
 
         return "User financial preferences updated successfully."
 
+
+    @tool
+    async def search_gmail(
+        query: str | None = None,
+        max_results: int = 10,
+    ) -> list[dict[str, Any]]:
+        """
+        Search and read the user's Gmail messages.
+
+        Use Gmail search syntax in `query`, for example:
+        - is:unread
+        - from:example@gmail.com
+        - subject:invoice
+        - has:attachment
+        - newer_than:7d
+        - is:unread from:example@gmail.com
+
+        Returns full Gmail messages including headers, snippets, labels,
+        and message payload data.
+        """
+
+        await update_status(
+            chat_id,
+            status_message_id,
+            f"📊 Searching Gmail messages...",
+        )
+        credentials = await get_user_google_credentials(user_id)
+
+        return read_gmail_messages(
+            credentials,
+            query=query,
+            max_results=max_results,
+        )
+
+    @tool
+    async def get_calendar_events(
+        time_min: str | None = None,
+        time_max: str | None = None,
+        max_results: int = 20,
+    ) -> list[dict[str, Any]]:
+        """
+        Read the user's Google Calendar events.
+
+        `time_min` and `time_max` should be RFC3339 timestamps.
+        Use them to restrict the search to a specific time range.
+
+        Examples:
+        - today's events
+        - tomorrow's meetings
+        - this week's schedule
+        """
+        await update_status(
+            chat_id,
+            status_message_id,
+            f"📊 Fetching calendar events...",
+        )
+        credentials = await get_user_google_credentials(user_id)
+
+        return list_calendar_events(
+            credentials,
+            time_min=time_min,
+            time_max=time_max,
+            max_results=max_results,
+        )
+
+
+    @tool
+    async def create_tool_calendar_event(
+        summary: str,
+        start: dict[str, str],
+        end: dict[str, str],
+        description: str | None = None,
+        location: str | None = None,
+        attendees: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Create an event in the user's primary Google Calendar.
+
+        `start` and `end` must contain either:
+        - dateTime: RFC3339 timestamp for a timed event
+        - date: YYYY-MM-DD for an all-day event
+
+        `attendees` should contain email addresses.
+        """
+        await update_status(
+            chat_id,
+            status_message_id,
+            f"📊 Creating calendar event...",
+        )
+        credentials = await get_user_google_credentials(user_id)
+
+        return create_calendar_event(
+            credentials,
+            summary=summary,
+            start=start,
+            end=end,
+            description=description,
+            location=location,
+            attendees=attendees,
+        )
+
     return [
         get_stock_quote,
         get_company_news,
@@ -332,4 +449,7 @@ def build_chat_tools(
         connect_google_account,
         get_user_preferences,
         update_tool_user_preferences,
+        search_gmail,
+        get_calendar_events,
+        create_tool_calendar_event,
     ]
