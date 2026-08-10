@@ -8,6 +8,8 @@ services:
     healthCheckPath: /health
     numInstances: 1
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
       - key: ENV
         value: production
       - key: DATABASE_URL
