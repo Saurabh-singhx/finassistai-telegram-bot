@@ -126,21 +126,14 @@ async def get_google_user_info(
         response.raise_for_status()
 
         return response.json()
-    
+
 async def get_user_google_credentials(
-    telegram_id: int | str,
+    user_id: str,
 ) -> Credentials:
-    """
-    Get Google OAuth credentials for a Telegram user.
-
-    The user's access and refresh tokens are stored on the User model.
-    """
-
-    telegram_id = int(telegram_id)
 
     async with AsyncSessionLocal() as session:
         user = await session.scalar(
-            select(User).where(User.telegram_id == telegram_id)
+            select(User).where(User.id == user_id)
         )
 
         if user is None:
