@@ -408,13 +408,24 @@ def build_chat_tools(
         attendees: list[str] | None = None,
     ) -> dict[str, Any]:
         """
-        Create an event in the user's primary Google Calendar if they are connected.
+        Create an event in the user's primary Google Calendar.
 
-        `start` and `end` must contain either:
-        - dateTime: RFC3339 timestamp for a timed event
-        - date: YYYY-MM-DD for an all-day event
+        IMPORTANT:
+        - All timed events must use Asia/Kolkata timezone.
+        - dateTime must be RFC3339.
+        - Include the timezone explicitly.
+        - Example:
+        {
+          "dateTime": "2026-08-12T17:00:00+05:30",
+          "timeZone": "Asia/Kolkata"
+        }
 
-        `attendees` should contain email addresses.
+        For an all-day event use:
+        {
+            "date": "2026-08-12"
+        }
+
+        Do not use UTC unless explicitly requested by the user.
         """
         await update_status(
             chat_id,

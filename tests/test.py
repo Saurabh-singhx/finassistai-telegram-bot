@@ -150,13 +150,13 @@ async def run_tests():
 
 
 asyncio.run(create_tool_calendar_event(
-        summary="Interview",
+        summary="Meeting with Team",
         start={
-            "dateTime": "2026-08-12T17:00:00+05:30",
+            "dateTime": "2026-08-11T17:00:00+05:30",
             "timeZone": "Asia/Kolkata",
         },
         end={
-            "dateTime": "2026-08-12T18:00:00+05:30",
+            "dateTime": "2026-08-11T18:00:00+05:30",
             "timeZone": "Asia/Kolkata",
         },
     ))
