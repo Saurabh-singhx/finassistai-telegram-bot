@@ -411,19 +411,11 @@ def build_chat_tools(
         Create an event in the user's primary Google Calendar.
 
         IMPORTANT:
+        - Always check current time and date from the system prompt and use it to create events.
         - All timed events must use Asia/Kolkata timezone.
         - dateTime must be RFC3339.
         - Include the timezone explicitly.
-        - Example:
-            summary="Meeting with Team",
-                start={
-                    "dateTime": "2026-08-11T17:00:00+05:30",
-                    "timeZone": "Asia/Kolkata",
-                },
-                end={
-                    "dateTime": "2026-08-11T18:00:00+05:30",
-                    "timeZone": "Asia/Kolkata",
-                },
+         
         """
         await update_status(
             chat_id,

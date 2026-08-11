@@ -1,5 +1,6 @@
 import asyncio
-from bs4 import BeautifulSoup
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from sqlalchemy import text
 from websockets.version import tag
 from app.services.market_data import finnhub_client, fred_client, sec_edgar
@@ -7,7 +8,7 @@ from app.services.rag_service import search_similar
 
 from app.services.google_oauth import get_user_google_credentials
 from app.services.google_service import read_gmail_messages, create_calendar_event
-
+from app.agents.chat.graph import run_chat_turn
 from typing import Any
 
 async def get_stock_quote(symbol: str) -> str:
@@ -148,15 +149,20 @@ async def run_tests():
     macro_data = await get_macro_series("CPIAUCSL")
     print(f"Macroeconomic Data for CPIAUCSL: {macro_data}")
 
+async def check_ai_response():
+    # current_date_time = datetime.now(
+    #     ZoneInfo("Asia/Kolkata")
+    # ).strftime("%Y-%m-%d %H:%M:%S %z")
 
-asyncio.run(create_tool_calendar_event(
-        summary="Meeting with Team",
-        start={
-            "dateTime": "2026-08-11T17:00:00+05:30",
-            "timeZone": "Asia/Kolkata",
-        },
-        end={
-            "dateTime": "2026-08-11T18:00:00+05:30",
-            "timeZone": "Asia/Kolkata",
-        },
-    ))
+    response = await run_chat_turn(
+        user_id="89144b23-0ed2-47d7-8dc8-de1cfb2a359a",
+        thread_id="1825492294",
+        user_context="google account connected : True",
+        user_text="set a meeting with friend tomorrow 2pm",
+        chat_id="",
+        status_message_id="",
+    )
+    print(f"AI Response: {response}")
+    # print(f"Current Date and Time in Asia/Kolkata timezone: {current_date_time}")
+
+asyncio.run(check_ai_response())
