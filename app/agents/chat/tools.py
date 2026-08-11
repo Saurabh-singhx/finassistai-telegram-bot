@@ -336,7 +336,7 @@ def build_chat_tools(
     @tool
     async def search_gmail(
         query: str | None = None,
-        max_results: int = 10,
+        max_results: int = 5,
     ) -> list[dict[str, Any]]:
         """
         Search and read the user's Gmail messages if they are connected.

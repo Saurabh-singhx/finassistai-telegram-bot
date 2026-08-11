@@ -1,6 +1,14 @@
 import asyncio
+from bs4 import BeautifulSoup
+from sqlalchemy import text
+from websockets.version import tag
 from app.services.market_data import finnhub_client, fred_client, sec_edgar
 from app.services.rag_service import search_similar
+
+from app.services.google_oauth import get_user_google_credentials
+from app.services.google_service import read_gmail_messages, create_calendar_event
+
+from typing import Any
 
 async def get_stock_quote(symbol: str) -> str:
     """Get the latest price quote for a stock ticker symbol, e.g. AAPL."""
@@ -28,6 +36,101 @@ async def search_my_documents(query: str) -> str:
         return "No relevant uploaded documents found."
     return "\n---\n".join(r.content[:800] for r in results)
 
+async def search_gmail(
+        query: str | None = None,
+        max_results: int = 5,
+    ) -> list[dict[str, Any]]:
+        """
+        Search and read the user's Gmail messages if they are connected.
+
+        Use Gmail search syntax in `query`, for example:
+        - is:unread
+        - from:example@gmail.com
+        - subject:invoice
+        - has:attachment
+        - newer_than:7d
+        - is:unread from:example@gmail.com
+
+        Returns full Gmail messages including headers, snippets, labels,
+        and message payload data.
+        """
+
+        # await update_status(
+        #     chat_id,
+        #     status_message_id,
+        #     f"📊 Searching Gmail messages...",
+        # )
+        credentials = await get_user_google_credentials("89144b23-0ed2-47d7-8dc8-de1cfb2a359a")
+
+        messages =  read_gmail_messages(
+            credentials,
+            query=query,
+            max_results=max_results,
+        )
+
+        # def clean_email_html(html: str) -> str:
+        #     soup = BeautifulSoup(html, "html.parser")
+
+        #     # Remove images and tracking pixels
+        #     for tag in soup.find_all(["img", "svg", "script", "style"]):
+        #         tag.decompose()
+
+        #     # Remove links that are just tracking/redirect URLs
+        #     for a in soup.find_all("a"):
+        #         text = a.get_text(" ", strip=True)
+
+        #         if text:
+        #             a.replace_with(text)
+        #         else:
+        #             a.decompose()
+
+        #     return soup.get_text(
+        #     separator="\n",
+        #     strip=True,
+        # )
+
+        for message in messages:
+            print("\n--- EMAIL ---")
+            print(f"From: {message['from']}")
+            print(f"Subject: {message['subject']}")
+            print(f"Date: {message['date']}")
+            print()
+            print(message)
+
+async def create_tool_calendar_event(
+        summary: str,
+        start: dict[str, str],
+        end: dict[str, str],
+        description: str | None = None,
+        location: str | None = None,
+        attendees: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Create an event in the user's primary Google Calendar if they are connected.
+
+        `start` and `end` must contain either:
+        - dateTime: RFC3339 timestamp for a timed event
+        - date: YYYY-MM-DD for an all-day event
+
+        `attendees` should contain email addresses.
+        """
+        credentials = await get_user_google_credentials("89144b23-0ed2-47d7-8dc8-de1cfb2a359a")
+
+        created_event =  create_calendar_event(
+            credentials,
+            summary=summary,
+            start=start,
+            end=end,
+            description=description,
+            location=location,
+            attendees=attendees,
+        )
+
+        print("\n--- CALENDAR EVENT CREATED ---")
+        print(f"Summary: {created_event['summary']}")
+        print(f"Start: {created_event['start']}")
+        print(f"End: {created_event['end']}")
+
 async def run_tests():
     # Test get_stock_quote
     quote = await get_stock_quote("AAPL")
@@ -46,4 +149,14 @@ async def run_tests():
     print(f"Macroeconomic Data for CPIAUCSL: {macro_data}")
 
 
-asyncio.run(run_tests())
+asyncio.run(create_tool_calendar_event(
+        summary="Interview",
+        start={
+            "dateTime": "2026-08-12T17:00:00+05:30",
+            "timeZone": "Asia/Kolkata",
+        },
+        end={
+            "dateTime": "2026-08-12T18:00:00+05:30",
+            "timeZone": "Asia/Kolkata",
+        },
+    ))
