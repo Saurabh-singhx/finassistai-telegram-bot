@@ -415,17 +415,15 @@ def build_chat_tools(
         - dateTime must be RFC3339.
         - Include the timezone explicitly.
         - Example:
-        {
-          "dateTime": "2026-08-12T17:00:00+05:30",
-          "timeZone": "Asia/Kolkata"
-        }
-
-        For an all-day event use:
-        {
-            "date": "2026-08-12"
-        }
-
-        Do not use UTC unless explicitly requested by the user.
+            summary="Meeting with Team",
+                start={
+                    "dateTime": "2026-08-11T17:00:00+05:30",
+                    "timeZone": "Asia/Kolkata",
+                },
+                end={
+                    "dateTime": "2026-08-11T18:00:00+05:30",
+                    "timeZone": "Asia/Kolkata",
+                },
         """
         await update_status(
             chat_id,
