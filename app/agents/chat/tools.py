@@ -22,7 +22,7 @@ from app.services.market_data import (
 )
 from app.services.rag_service import search_similar
 from app.services.telegram_service import update_status
-
+from app.agents.chat.prompts import SYSTEM_PROMPT
 from app.repositories.user_preferences import (
     add_watchlist_item,
     get_user_financial_preferences,
@@ -42,6 +42,16 @@ from app.services.google_service import (
     create_calendar_event,
 )
 from app.services.memory_service import get_recent_messages
+
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+
+def date_to_timestamp(date_str: str) -> int:
+    dt = datetime.strptime(date_str, "%Y-%m-%d").replace(
+        tzinfo=ZoneInfo("Asia/Kolkata")
+    )
+    return int(dt.timestamp())
 
 def build_chat_tools(
     db,
@@ -144,24 +154,34 @@ def build_chat_tools(
     @tool
     async def get_finhub_historical_prices(
         symbol: str,
-        start_timestamp: int,
-        end_timestamp: int,
+        start_date: str,
+        end_date: str,
         resolution: str,
     ) -> str:
-        """Get historical stock prices for a company."""
+        """
+        Get historical stock prices.
+
+        start_date and end_date must be YYYY-MM-DD.
+        Always use the current date from the system context when calculating
+        dates for relative requests such as "last week" or "last month".
+        """
 
         await update_status(
             chat_id,
             status_message_id,
             f"📈 Fetching historical prices for {symbol.upper()}...",
         )
-
-        return await finnhub_client.get_historical_prices(
+        start_timestamp = date_to_timestamp(start_date)
+        end_timestamp = date_to_timestamp(end_date)
+        print(f"Fetching historical prices for {symbol.upper()} from {start_timestamp} to {end_timestamp} with resolution {resolution}...")
+        data =  await finnhub_client.get_historical_prices(
             symbol,
             start_timestamp,
             end_timestamp,
             resolution,
         )
+        print(f"Fetched historical prices for {symbol.upper()}: {data}")
+        return data
 
     @tool
     async def get_finhub_historical_earnings(symbol: str) -> str:

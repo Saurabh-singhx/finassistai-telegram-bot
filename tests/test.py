@@ -3,12 +3,12 @@ from sqlalchemy import text
 from websockets.version import tag
 from app.services.market_data import finnhub_client, fred_client, sec_edgar
 from app.services.rag_service import search_similar
-
+from datetime import datetime, timezone
 from app.services.google_oauth import get_user_google_credentials
 from app.services.google_service import read_gmail_messages, create_calendar_event
 from app.agents.chat.graph import run_chat_turn
 from typing import Any
-
+from app.services.market_data.finnhub_client import get_historical_prices
 async def get_stock_quote(symbol: str) -> str:
     """Get the latest price quote for a stock ticker symbol, e.g. AAPL."""
     return await finnhub_client.get_quote(symbol)
@@ -135,22 +135,37 @@ async def create_tool_calendar_event(
         print(f"Start: {created_event['start']}")
         print(f"End: {created_event['end']}")
 
+def to_timestamp(date: str) -> int:
+    return int(
+        datetime.strptime(date, "%Y-%m-%d")
+        .replace(tzinfo=timezone.utc)
+        .timestamp()
+    )
+
 async def run_tests():
     # Test get_stock_quote
-    quote = await get_stock_quote("AAPL")
-    print(f"Stock Quote for AAPL: {quote}")
+    # quote = await get_stock_quote("AAPL")
+    # print(f"Stock Quote for AAPL: {quote}")
 
-    # Test get_company_news
-    news = await get_company_news("AAPL")
-    print(f"Company News for AAPL: {news}")
+    # # Test get_company_news
+    # news = await get_company_news("AAPL")
+    # print(f"Company News for AAPL: {news}")
 
-    # Test get_sec_filings
-    filings = await get_sec_filings("AAPL")
-    print(f"SEC Filings for AAPL: {filings}")
+    # # Test get_sec_filings
+    # filings = await get_sec_filings("AAPL")
+    # print(f"SEC Filings for AAPL: {filings}")
 
-    # Test get_macro_series
-    macro_data = await get_macro_series("CPIAUCSL")
-    print(f"Macroeconomic Data for CPIAUCSL: {macro_data}")
+    # # Test get_macro_series
+    # macro_data = await get_macro_series("CPIAUCSL")
+    # print(f"Macroeconomic Data for CPIAUCSL: {macro_data}")
+
+    historical_prices = await get_historical_prices(
+        symbol="AAPL",
+        start_timestamp=to_timestamp("2026-08-01"),
+        end_timestamp=to_timestamp("2026-08-10"),
+        resolution="D",
+    )
+    print(f"Historical Prices for AAPL: {historical_prices}")
 
 async def check_ai_response():
     # current_date_time = datetime.now(
@@ -160,12 +175,11 @@ async def check_ai_response():
     response = await run_chat_turn(
         user_id="89144b23-0ed2-47d7-8dc8-de1cfb2a359a",
         thread_id="1825492294",
-        user_context="google account connected : True",
-        user_text="set a meeting with friend tomorrow 2pm",
-        chat_id="",
+        user_context="google account connected : False",
+        user_text="how is the stock performance of aapl in last 7 days ",
         status_message_id="",
     )
     print(f"AI Response: {response}")
     # print(f"Current Date and Time in Asia/Kolkata timezone: {current_date_time}")
 
-asyncio.run(tool_check("1ee4eee7-aca3-43b1-a133-9de1e0df1138"))
+asyncio.run(check_ai_response())

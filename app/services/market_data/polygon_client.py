@@ -38,7 +38,7 @@ async def get_historical_prices(
         )
         response.raise_for_status()
         payload = response.json()
-
+    
     rows = payload.get("results", [])
     if not isinstance(rows, list):
         return None

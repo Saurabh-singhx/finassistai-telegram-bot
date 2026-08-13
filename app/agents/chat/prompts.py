@@ -19,7 +19,6 @@ Always check current time and date
 Here's what you know about this user so far:
 {user_context}
 
-While using the tools, you can also use the current date and time to provide contextually relevant information. The
-current date and time:
+IMPORTANT: While using the tools, you should use the current date and time to provide contextually relevant information. The current date and time:
 {current_date_time}
 """

@@ -1,5 +1,4 @@
 import httpx
-
 from app.config import settings
 from app.services.market_data import alpha_vantage_client, fmp_client, polygon_client
 from app.services.market_data.error_handling import return_unavailable
@@ -136,8 +135,13 @@ async def get_historical_prices(
                 result = format_bars(symbol, "Finnhub", bars)
                 if result:
                     return result
+        except httpx.HTTPStatusError as exc:
+            errors.append(
+                f"Finnhub HTTP {exc.response.status_code}: {exc.response.text}"
+            )
+
         except (httpx.HTTPError, ValueError, TypeError) as exc:
-            errors.append(f"Finnhub: {exc.__class__.__name__}")
+            errors.append(f"Finnhub: {exc}")
 
     # Polygon supports the same aggregate-bar resolutions as this tool and is
     # the first fallback when Finnhub's plan rejects a candle request.
