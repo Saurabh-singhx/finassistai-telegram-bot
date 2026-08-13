@@ -52,9 +52,9 @@ def build_chat_tools(
     user_uuid = UUID(user_id)
 
     @tool
-    async def get_recent_messages_tool():
+    async def get_recent_messages_tool(limit: int):
         """get recent messages if needed for context"""
-        messages = await get_recent_messages(db, user_id=user_uuid)
+        messages = await get_recent_messages(db, user_id=user_uuid, limit=limit)
 
         if not messages:
             return "No recent messages found."
