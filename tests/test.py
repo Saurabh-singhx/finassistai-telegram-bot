@@ -1,6 +1,4 @@
 import asyncio
-from datetime import datetime
-from zoneinfo import ZoneInfo
 from sqlalchemy import text
 from websockets.version import tag
 from app.services.market_data import finnhub_client, fred_client, sec_edgar
@@ -36,6 +34,11 @@ async def search_my_documents(query: str) -> str:
     if not results:
         return "No relevant uploaded documents found."
     return "\n---\n".join(r.content[:800] for r in results)
+
+async def tool_check(user_id: str) -> list[dict[str, Any]]:
+    """Get recent messages for the user, if needed for context."""
+    messages = await get_recent_messages_tool(user_id=user_id)
+    return messages
 
 async def search_gmail(
         query: str | None = None,
@@ -165,4 +168,4 @@ async def check_ai_response():
     print(f"AI Response: {response}")
     # print(f"Current Date and Time in Asia/Kolkata timezone: {current_date_time}")
 
-asyncio.run(run_tests())
+asyncio.run(tool_check("1ee4eee7-aca3-43b1-a133-9de1e0df1138"))

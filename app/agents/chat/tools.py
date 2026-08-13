@@ -41,6 +41,7 @@ from app.services.google_service import (
     list_calendar_events,
     create_calendar_event,
 )
+from app.services.memory_service import get_recent_messages
 
 def build_chat_tools(
     db,
@@ -49,6 +50,16 @@ def build_chat_tools(
     status_message_id: int,
 ):
     user_uuid = UUID(user_id)
+
+    @tool
+    async def get_recent_messages_tool():
+        """get recent messages if needed for context"""
+        messages = await get_recent_messages(db, user_id=user_uuid)
+
+        if not messages:
+            return "No recent messages found."
+        
+        return messages
 
     @tool
     async def get_stock_quote(symbol: str) -> str:
@@ -453,4 +464,5 @@ def build_chat_tools(
         search_gmail,
         get_calendar_events,
         create_tool_calendar_event,
+        get_recent_messages_tool,
     ]

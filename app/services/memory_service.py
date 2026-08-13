@@ -12,11 +12,27 @@ async def log_message(db: AsyncSession, user_id, thread_id: str, role: str, cont
     await db.flush()
 
 
-async def get_recent_messages(db: AsyncSession, user_id, limit: int = RECENT_MESSAGE_LIMIT) -> list[Message]:
+from sqlalchemy import select, desc
+from sqlalchemy.ext.asyncio import AsyncSession
+
+async def get_recent_messages(
+    db: AsyncSession,
+    user_id,
+    limit: int = RECENT_MESSAGE_LIMIT,
+):
     result = await db.execute(
-        select(Message).where(Message.user_id == user_id).order_by(desc(Message.created_at)).limit(limit)
+        select(
+            Message.role,
+            Message.content,
+            Message.message_type,
+            Message.created_at,
+        )
+        .where(Message.user_id == user_id)
+        .order_by(desc(Message.created_at))
+        .limit(limit)
     )
-    return list(reversed(result.scalars().all()))
+
+    return list(reversed(result.all()))
 
 
 async def get_user_context(
