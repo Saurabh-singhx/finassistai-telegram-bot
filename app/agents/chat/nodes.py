@@ -12,7 +12,6 @@ from app.services.llm_service import log_cache_usage
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-now = datetime.now(ZoneInfo("Asia/Kolkata"))
 
 def build_agent_node(db, user_id: str, chat_id: int, status_message_id: int):
     tools = build_chat_tools(db, user_id, chat_id, status_message_id)
@@ -20,6 +19,7 @@ def build_agent_node(db, user_id: str, chat_id: int, status_message_id: int):
 
     
     async def agent_node(state: ChatState) -> ChatState:
+        now = datetime.now(ZoneInfo("Asia/Kolkata"))
         system = SystemMessage(content=SYSTEM_PROMPT.format(user_context=state.get("user_context", "Nothing yet."),current_date_time=now.strftime("%Y-%m-%d %H:%M:%S %z")))
         trimmed = trim_messages(
             state["messages"],
