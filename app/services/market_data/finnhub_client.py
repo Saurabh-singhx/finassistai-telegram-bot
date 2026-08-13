@@ -7,20 +7,78 @@ from app.services.market_data.historical_prices import format_bars, timestamp_to
 BASE_URL = "https://finnhub.io/api/v1"
 
 
-@return_unavailable("Finnhub")
 async def get_quote(symbol: str) -> str:
-    if not settings.FINNHUB_API_KEY:
-        return "Finnhub API key not configured."
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(f"{BASE_URL}/quote", params={"symbol": symbol, "token": settings.FINNHUB_API_KEY})
-        resp.raise_for_status()
-        data = resp.json()
-    if not data or data.get("c") in (None, 0):
-        return f"No quote data found for {symbol}."
-    change_pct = data.get("dp", 0)
-    direction = "up" if change_pct >= 0 else "down"
-    return f"{symbol}: ${data.get('c')} ({direction} {abs(change_pct):.2f}% today, prev close ${data.get('pc')})"
+    symbol = symbol.upper()
+    errors = []
 
+    #finnhub ---->
+    if settings.FINNHUB_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    f"{BASE_URL}/quote",
+                    params={
+                        "symbol": symbol,
+                        "token": settings.FINNHUB_API_KEY,
+                    },
+                )
+
+                resp.raise_for_status()
+                data = resp.json()
+
+            if data and data.get("c") not in (None, 0):
+                change_pct = data.get("dp") or 0
+                direction = "up" if change_pct >= 0 else "down"
+
+                return (
+                    f"{symbol}: ${data['c']} "
+                    f"({direction} {abs(change_pct):.2f}% today, "
+                    f"prev close ${data.get('pc')})"
+                )
+
+            errors.append("Finnhub: no quote data")
+
+        except httpx.HTTPStatusError as exc:
+            errors.append(
+                f"Finnhub HTTP {exc.response.status_code}"
+            )
+
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
+            errors.append(
+                f"Finnhub: {exc.__class__.__name__}"
+            )
+
+    else:
+        errors.append("Finnhub: API key not configured")
+
+    #polygon ---->
+    if settings.POLYGON_API_KEY:
+        try:
+            result = await polygon_client.get_quote(symbol)
+
+            if result:
+                return result
+
+            errors.append("Polygon: no quote data")
+
+        except httpx.HTTPStatusError as exc:
+            errors.append(
+                f"Polygon HTTP {exc.response.status_code}"
+            )
+
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
+            errors.append(
+                f"Polygon: {exc.__class__.__name__}"
+            )
+
+    else:
+        errors.append("Polygon: API key not configured")
+
+    # nothing worked, return a message with the errors
+    return (
+        f"No reliable quote available for {symbol}. "
+        f"Providers checked: {'; '.join(errors)}"
+    )
 
 @return_unavailable("Finnhub")
 async def get_company_news(symbol: str, limit: int = 5) -> str:

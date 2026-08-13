@@ -55,3 +55,27 @@ async def get_historical_prices(
         if isinstance(row, dict) and isinstance(row.get("t"), int)
     ]
     return format_bars(symbol, "Polygon", bars)
+
+async def get_quote(symbol: str) -> str | None:
+    if not settings.POLYGON_API_KEY:
+        return None
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.get(
+            f"https://api.polygon.io/v2/last/trade/{symbol.upper()}",
+            params={
+                "apiKey": settings.POLYGON_API_KEY,
+            },
+        )
+
+        response.raise_for_status()
+        data = response.json()
+
+    result = data.get("results")
+
+    if not result or result.get("p") is None:
+        return None
+
+    price = result["p"]
+
+    return f"{symbol.upper()}: ${price} (Polygon)"

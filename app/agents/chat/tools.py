@@ -179,6 +179,7 @@ def build_chat_tools(
             end_timestamp,
             resolution,
         )
+        print(f"Historical prices for {symbol.upper()} from {start_date} to {end_date}: {data}")
         return data
 
     @tool
