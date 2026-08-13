@@ -161,8 +161,8 @@ async def run_tests():
 
     historical_prices = await get_historical_prices(
         symbol="AAPL",
-        start_timestamp=to_timestamp("2026-08-01"),
-        end_timestamp=to_timestamp("2026-08-10"),
+        start_timestamp=to_timestamp("2026-08-06"),
+        end_timestamp=to_timestamp("2026-08-13"),
         resolution="D",
     )
     print(f"Historical Prices for AAPL: {historical_prices}")
@@ -173,10 +173,11 @@ async def check_ai_response():
     # ).strftime("%Y-%m-%d %H:%M:%S %z")
 
     response = await run_chat_turn(
-        user_id="89144b23-0ed2-47d7-8dc8-de1cfb2a359a",
+        user_id="cd281dd1-b733-4975-9927-5fcf8a58d75c",
         thread_id="1825492294",
         user_context="google account connected : False",
         user_text="how is the stock performance of aapl in last 7 days ",
+        chat_id="",
         status_message_id="",
     )
     print(f"AI Response: {response}")

@@ -96,24 +96,31 @@ async def get_historical_prices(
     end_timestamp: int,
     resolution: str = "D",
 ) -> str:
-    """Fetch candles from Finnhub, with daily fallbacks for restricted plans."""
+    """Fetch historical OHLCV data with multiple provider fallbacks."""
+
+    symbol = symbol.upper()
+    resolution = resolution.upper()
+
     from_date = timestamp_to_date(start_timestamp)
     to_date = timestamp_to_date(end_timestamp)
-    errors = []
 
+    errors: list[str] = []
+
+    #finhub ---->
     if settings.FINNHUB_API_KEY:
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.get(
                     f"{BASE_URL}/stock/candle",
                     params={
-                        "symbol": symbol.upper(),
+                        "symbol": symbol,
                         "resolution": resolution,
                         "from": start_timestamp,
                         "to": end_timestamp,
                         "token": settings.FINNHUB_API_KEY,
                     },
                 )
+
                 response.raise_for_status()
                 data = response.json()
 
@@ -127,56 +134,157 @@ async def get_historical_prices(
                         "close": close_price,
                         "volume": volume,
                     }
-                    for timestamp, open_price, high_price, low_price, close_price, volume in zip(
-                        data.get("t", []), data.get("o", []), data.get("h", []),
-                        data.get("l", []), data.get("c", []), data.get("v", []),
+                    for timestamp, open_price, high_price, low_price, close_price, volume
+                    in zip(
+                        data.get("t", []),
+                        data.get("o", []),
+                        data.get("h", []),
+                        data.get("l", []),
+                        data.get("c", []),
+                        data.get("v", []),
                     )
                 ]
-                result = format_bars(symbol, "Finnhub", bars)
-                if result:
-                    return result
+
+                # Don't accept an incomplete result as success.
+                if len(bars) >= 2:
+                    print(
+                        f"Fetched historical prices for {symbol}: "
+                        f"Finnhub ({len(bars)} bars)"
+                    )
+                    return format_bars(symbol, "Finnhub", bars)
+
+                errors.append(
+                    f"Finnhub: insufficient data ({len(bars)} bars)"
+                )
+
+            else:
+                errors.append(
+                    f"Finnhub: status={data.get('s', 'unknown')}"
+                )
+
         except httpx.HTTPStatusError as exc:
             errors.append(
-                f"Finnhub HTTP {exc.response.status_code}: {exc.response.text}"
+                f"Finnhub HTTP {exc.response.status_code}: "
+                f"{exc.response.text}"
             )
 
         except (httpx.HTTPError, ValueError, TypeError) as exc:
-            errors.append(f"Finnhub: {exc}")
+            errors.append(
+                f"Finnhub: {exc.__class__.__name__}: {exc}"
+            )
 
-    # Polygon supports the same aggregate-bar resolutions as this tool and is
-    # the first fallback when Finnhub's plan rejects a candle request.
-    try:
-        result = await polygon_client.get_historical_prices(
-            symbol, from_date, to_date, resolution
-        )
-        if result:
-            return result
-    except (httpx.HTTPError, ValueError, TypeError) as exc:
-        errors.append(f"Polygon: {exc.__class__.__name__}")
+    else:
+        errors.append("Finnhub: API key not configured")
 
-    # FMP and Alpha Vantage provide daily bars only through this fallback path.
-    if resolution.upper() == "D":
-        for provider, fetcher in (
-            ("FMP", fmp_client.get_historical_prices),
-            ("Alpha Vantage", alpha_vantage_client.get_daily_historical_prices),
-        ):
-            try:
-                result = await fetcher(symbol, from_date, to_date)
-                if result:
-                    return result
-            except (httpx.HTTPError, ValueError, TypeError) as exc:
-                errors.append(f"{provider}: {exc.__class__.__name__}")
+    #polygon ---->
+    if settings.POLYGON_API_KEY:
+        try:
+            result = await polygon_client.get_historical_prices(
+                symbol,
+                from_date,
+                to_date,
+                resolution,
+            )
 
-    requested_resolution = resolution.upper()
-    if requested_resolution != "D":
+            if result:
+                print(
+                    f"Fetched historical prices for {symbol}: "
+                    f"Polygon"
+                )
+                return result
+
+            errors.append("Polygon: no data returned")
+
+        except httpx.HTTPStatusError as exc:
+            errors.append(
+                f"Polygon HTTP {exc.response.status_code}"
+            )
+
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
+            errors.append(
+                f"Polygon: {exc.__class__.__name__}: {exc}"
+            )
+
+    else:
+        errors.append("Polygon: API key not configured")
+
+    #FMP ---->
+    if resolution == "D" and settings.FMP_API_KEY:
+        try:
+            result = await fmp_client.get_historical_prices(
+                symbol,
+                from_date,
+                to_date,
+            )
+
+            if result:
+                print(
+                    f"Fetched historical prices for {symbol}: "
+                    f"FMP"
+                )
+                return result
+
+            errors.append("FMP: no data returned")
+
+        except httpx.HTTPStatusError as exc:
+            errors.append(
+                f"FMP HTTP {exc.response.status_code}"
+            )
+
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
+            errors.append(
+                f"FMP: {exc.__class__.__name__}: {exc}"
+            )
+
+    elif resolution == "D":
+        errors.append("FMP: API key not configured")
+
+    #alpha vantage ---->
+    if resolution == "D" and settings.ALPHA_VANTAGE_API_KEY:
+        try:
+            result = await alpha_vantage_client.get_daily_historical_prices(
+                symbol,
+                from_date,
+                to_date,
+            )
+
+            if result:
+                print(
+                    f"Fetched historical prices for {symbol}: "
+                    f"Alpha Vantage"
+                )
+                return result
+
+            errors.append("Alpha Vantage: no data returned")
+
+        except httpx.HTTPStatusError as exc:
+            errors.append(
+                f"Alpha Vantage HTTP {exc.response.status_code}"
+            )
+
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
+            errors.append(
+                f"Alpha Vantage: {exc.__class__.__name__}: {exc}"
+            )
+
+    elif resolution == "D":
+        errors.append("Alpha Vantage: API key not configured")
+
+    #nothing worked, return a message with the errors
+
+    if resolution != "D":
         return (
-            f"Historical {requested_resolution} candles for {symbol.upper()} are unavailable. "
-            "Finnhub denied the request, and the configured fallbacks support daily bars only."
+            f"Historical {resolution} candles for {symbol} "
+            f"are unavailable. "
+            f"Finnhub, Polygon, and the configured fallback "
+            f"providers could not provide the requested data."
         )
+
     return (
-        f"Historical daily prices for {symbol.upper()} are unavailable from the configured providers. "
-        f"Checked Finnhub, Polygon, FMP, and Alpha Vantage "
-        f"({'; '.join(errors) or 'no data returned'})."
+        f"Historical daily prices for {symbol} are unavailable "
+        f"for {from_date} to {to_date}. "
+        f"Providers checked: "
+        f"{'; '.join(errors)}"
     )
 
 @return_unavailable("Finnhub")

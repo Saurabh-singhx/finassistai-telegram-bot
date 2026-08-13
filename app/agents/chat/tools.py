@@ -173,14 +173,12 @@ def build_chat_tools(
         )
         start_timestamp = date_to_timestamp(start_date)
         end_timestamp = date_to_timestamp(end_date)
-        print(f"Fetching historical prices for {symbol.upper()} from {start_timestamp} to {end_timestamp} with resolution {resolution}...")
         data =  await finnhub_client.get_historical_prices(
             symbol,
             start_timestamp,
             end_timestamp,
             resolution,
         )
-        print(f"Fetched historical prices for {symbol.upper()}: {data}")
         return data
 
     @tool
