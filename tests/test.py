@@ -165,4 +165,4 @@ async def check_ai_response():
     print(f"AI Response: {response}")
     # print(f"Current Date and Time in Asia/Kolkata timezone: {current_date_time}")
 
-asyncio.run(check_ai_response())
+asyncio.run(run_tests())

@@ -1,16 +1,17 @@
 import hmac
 import logging
-
 from sqlalchemy import select
 from telegram import Update
 from telegram.ext import ContextTypes
-
+import uuid
+from datetime import datetime, timedelta, timezone
 from app.agents.chat.graph import run_chat_turn
 from app.agents.onboarding.graph import run_onboarding
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.decorators.error_handler import handle_errors
 from app.models.user import User
+from app.models.messages import Message
 from app.services import memory_service, rag_service, telegram_service
 from app.services.telegram_service import delete_status
 logger = logging.getLogger("finassist.bot")
@@ -83,6 +84,35 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await db.commit()
     await telegram_service.send_message(update.effective_chat.id, reply)
 
+async def get_or_create_thread_id(
+    db,
+    user_id: uuid.UUID,
+) -> str:
+
+    result = await db.execute(
+        select(Message)
+        .where(Message.user_id == user_id)
+        .order_by(Message.created_at.desc())
+        .limit(1)
+    )
+
+    last_message = result.scalar_one_or_none()
+
+    # First conversation
+    if last_message is None:
+        return str(uuid.uuid4())
+
+    last_activity = last_message.created_at
+
+    if last_activity.tzinfo is None:
+        last_activity = last_activity.replace(tzinfo=timezone.utc)
+
+    now = datetime.now(timezone.utc)
+
+    if now - last_activity < timedelta(hours=1):
+        return last_message.thread_id
+    
+    return str(uuid.uuid4())
 
 @handle_errors()
 async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -118,13 +148,18 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 await telegram_service.send_message(update.effective_chat.id, reply)
                 return
 
-            await memory_service.log_message(db, user.id, str(user.telegram_id), "user", text)
+            thread_id = await get_or_create_thread_id(
+                db,
+                user.id,
+            )
+
+            await memory_service.log_message(db, user.id, str(thread_id), "user", text)
             user_context = await memory_service.get_user_context(db, user.id)
             await db.commit()
 
         reply = await run_chat_turn(
             user_id=str(user.id),
-            thread_id=str(user.telegram_id),
+            thread_id=str(thread_id),
             user_context=user_context,
             user_text=text,
             chat_id=chat_id,
@@ -132,7 +167,7 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         )
 
         async with AsyncSessionLocal() as db:
-            await memory_service.log_message(db, user.id, str(user.telegram_id), "assistant", reply)
+            await memory_service.log_message(db, user.id, str(thread_id), "assistant", reply)
             await db.commit()
 
         await telegram_service.send_message(update.effective_chat.id, reply)
@@ -176,12 +211,17 @@ async def document_handler(
         )
         return
 
+    thread_id = await get_or_create_thread_id(
+        db,
+        user.id,
+    )
+
     async with AsyncSessionLocal() as db:
         # Save the uploaded file as a user message
         await memory_service.log_message(
             db,
             user.id,
-            str(user.telegram_id),
+            str(thread_id),
             "user",
             f"[File uploaded] {filename}",
         )
@@ -205,7 +245,7 @@ async def document_handler(
         await memory_service.log_message(
             db,
             user.id,
-            str(user.telegram_id),
+            str(thread_id),
             "assistant",
             reply,
         )
@@ -240,12 +280,17 @@ async def photo_handler(
         )
         return
 
+    thread_id = await get_or_create_thread_id(
+            db,
+            user.id,
+        )
+
     async with AsyncSessionLocal() as db:
         # Save the image upload as a user message
         await memory_service.log_message(
             db,
             user.id,
-            str(user.telegram_id),
+            str(thread_id),
             "user",
             "[Image uploaded]",
             message_type="image",
@@ -266,7 +311,7 @@ async def photo_handler(
         await memory_service.log_message(
             db,
             user.id,
-            str(user.telegram_id),
+            str(thread_id),
             "assistant",
             reply,
         )
@@ -302,12 +347,17 @@ async def voice_handler(
         )
         return
 
+    thread_id = await get_or_create_thread_id(
+        db,
+        user.id,
+    )
+
     async with AsyncSessionLocal() as db:
         # Save the transcribed voice message as the user's message
         await memory_service.log_message(
             db,
             user.id,
-            str(user.telegram_id),
+            str(thread_id),
             "user",
             transcript,
             message_type="voice",
@@ -329,7 +379,7 @@ async def voice_handler(
         # Let the normal chat agent process the transcription.
         reply = await run_chat_turn(
             user_id=str(user.id),
-            thread_id=str(user.telegram_id),
+            thread_id=str(thread_id),
             user_context=user_context,
             user_text=transcript,
             chat_id=chat_id,
@@ -340,7 +390,7 @@ async def voice_handler(
             await memory_service.log_message(
                 db,
                 user.id,
-                str(user.telegram_id),
+                str(thread_id),
                 "assistant",
                 reply,
             )
