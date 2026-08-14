@@ -144,7 +144,7 @@ def to_timestamp(date: str) -> int:
 
 async def run_tests():
     # Test get_stock_quote
-    quote = await get_stock_quote("INFY")
+    quote = await get_stock_quote("TCS")
     print(f"Stock Quote for INFY: {quote}")
 
     # Test get_company_news
@@ -160,7 +160,7 @@ async def run_tests():
     print(f"Macroeconomic Data for CPIAUCSL: {macro_data}")
 
     historical_prices = await get_historical_prices(
-        symbol="INFY",
+        symbol="INFY.NS",
         start_timestamp=to_timestamp("2026-08-06"),
         end_timestamp=to_timestamp("2026-08-13"),
         resolution="D",
@@ -176,11 +176,11 @@ async def check_ai_response():
         user_id="cd281dd1-b733-4975-9927-5fcf8a58d75c",
         thread_id="1825492294",
         user_context="google account connected : False",
-        user_text="how was the performance of infosys today? and also give me the recent news about infosys and also give me the recent sec filings of infosys",
+        user_text="stock quote for hdfc",
         chat_id="",
         status_message_id="",
     )
     print(f"AI Response: {response}")
     # print(f"Current Date and Time in Asia/Kolkata timezone: {current_date_time}")
 
-asyncio.run(run_tests())
+asyncio.run(check_ai_response())

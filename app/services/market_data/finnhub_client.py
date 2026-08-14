@@ -3,14 +3,23 @@ from app.config import settings
 from app.services.market_data import alpha_vantage_client, fmp_client, polygon_client
 from app.services.market_data.error_handling import return_unavailable
 from app.services.market_data.historical_prices import format_bars, timestamp_to_date
-
+from app.services.market_data.yahoo_client import get_indian_historical_prices,get_indian_quote
 BASE_URL = "https://finnhub.io/api/v1"
 
 
 async def get_quote(symbol: str) -> str:
     symbol = symbol.upper()
     errors = []
-
+    if symbol.endswith(".NS") or symbol.endswith(".BO"):
+            result = await get_indian_quote(symbol)
+    
+            if result:
+                return result
+    
+            return (
+                f"Quote for Indian stock {symbol} "
+                "are currently unavailable."
+            )
     #finnhub ---->
     if settings.FINNHUB_API_KEY:
         try:
@@ -158,7 +167,21 @@ async def get_historical_prices(
 
     symbol = symbol.upper()
     resolution = resolution.upper()
+    if symbol.endswith(".NS") or symbol.endswith(".BO"):
+        result = await get_indian_historical_prices(
+            symbol,
+            start_timestamp,
+            end_timestamp,
+            resolution,
+        )
 
+        if result:
+            return result
+
+        return (
+            f"Historical prices for Indian stock {symbol} "
+            "are currently unavailable."
+        )
     from_date = timestamp_to_date(start_timestamp)
     to_date = timestamp_to_date(end_timestamp)
 

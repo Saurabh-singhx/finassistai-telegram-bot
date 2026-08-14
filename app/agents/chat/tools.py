@@ -73,7 +73,22 @@ def build_chat_tools(
 
     @tool
     async def get_stock_quote(symbol: str) -> str:
-        """Get the latest price quote for a stock ticker symbol, e.g. AAPL."""
+        """Get the latest price quote for a stock.
+            For Indian NSE stocks, always use the Yahoo/NSE symbol format:
+            TCS.NS
+            INFY.NS
+            RELIANCE.NS
+            HDFCBANK.NS
+            
+            For Indian BSE stocks, use:
+            TCS.BO
+            INFY.BO
+            
+            For US stocks use the normal ticker:
+            AAPL
+            MSFT
+            GOOGL
+        """
 
         await update_status(
             chat_id,
@@ -159,13 +174,24 @@ def build_chat_tools(
         resolution: str,
     ) -> str:
         """
-        Get historical stock prices.
+        Get historical stock OHLCV prices.
 
-        start_date and end_date must be YYYY-MM-DD.
-        Always use the current date from the system context when calculating
-        dates for relative requests such as "last week" or "last month".
+        For Indian NSE stocks, always use the Yahoo/NSE symbol format:
+        TCS.NS
+        INFY.NS
+        RELIANCE.NS
+        HDFCBANK.NS
+
+        For Indian BSE stocks, use:
+        TCS.BO
+        INFY.BO
+
+        For US stocks use the normal ticker:
+        AAPL
+        MSFT
+        GOOGL
         """
-
+        
         await update_status(
             chat_id,
             status_message_id,
