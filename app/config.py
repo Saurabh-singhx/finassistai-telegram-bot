@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     TELEGRAM_WEBHOOK_SECRET: str | None = None
     # LLM
     GOOGLE_API_KEY: str
-    LLM_MODEL: str = "gemini-3.1-flash-lite"
+    LLM_MODEL: str = "gemini-3.5-flash-lite"
     EMBEDDING_MODEL: str = "gemini-embedding-001"
 
     # Market data - Phase 1
