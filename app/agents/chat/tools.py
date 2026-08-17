@@ -22,7 +22,6 @@ from app.services.market_data import (
 )
 from app.services.rag_service import search_similar
 from app.services.telegram_service import update_status
-from app.agents.chat.prompts import SYSTEM_PROMPT
 from app.repositories.user_preferences import (
     add_watchlist_item,
     get_user_financial_preferences,
@@ -205,7 +204,6 @@ def build_chat_tools(
             end_timestamp,
             resolution,
         )
-        print(f"Historical prices for {symbol.upper()} from {start_date} to {end_date}: {data}")
         return data
 
     @tool

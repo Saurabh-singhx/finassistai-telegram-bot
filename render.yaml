@@ -19,8 +19,6 @@ services:
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET
         sync: false
-      - key: ONE_TIME_PASSWORD
-        sync: false
       - key: GOOGLE_API_KEY
         sync: false
       - key: GOOGLE_REDIRECT_URI

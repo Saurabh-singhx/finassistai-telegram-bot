@@ -35,8 +35,7 @@ class User(Base):
         nullable=True,
     )
 
-    # Access is granted only after this Telegram user supplies ONE_TIME_PASSWORD.
-    # It remains granted even if the shared password is rotated later.
+    # Retained for compatibility with existing databases. It is not used for access control.
     is_verified: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

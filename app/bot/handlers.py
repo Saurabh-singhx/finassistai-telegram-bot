@@ -1,4 +1,3 @@
-import hmac
 import logging
 from sqlalchemy import select
 from telegram import Update
@@ -7,7 +6,6 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from app.agents.chat.graph import run_chat_turn
 from app.agents.onboarding.graph import run_onboarding
-from app.config import settings
 from app.database import AsyncSessionLocal
 from app.decorators.error_handler import handle_errors
 from app.models.user import User
@@ -17,8 +15,6 @@ from app.services.telegram_service import delete_status
 logger = logging.getLogger("finassist.bot")
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
-ACCESS_PASSWORD_PROMPT = "This bot is private. Send the access password to continue."
-ACCESS_DENIED_PROMPT = "That password is not correct. Please try again."
 
 
 async def _get_or_create_user(db, update: Update) -> User:
@@ -45,38 +41,17 @@ def _onboarding_complete(user: User) -> bool:
     return bool((user.onboarding_state or {}).get("completed"))
 
 
-def _password_matches(password: str) -> bool:
-    expected_password = settings.ONE_TIME_PASSWORD
-    return bool(expected_password) and hmac.compare_digest(password, expected_password)
-
-
-async def _authorize_user(update: Update, password: str | None = None) -> tuple[User, bool, bool]:
-    """Create the Telegram user if needed and grant access only after password verification.
-
-    This deliberately runs before any upload download, OCR, embedding, onboarding, or chat call.
-    """
+async def _get_or_create_current_user(update: Update) -> User:
+    """Return the Telegram user, creating it on their first interaction."""
     async with AsyncSessionLocal() as db:
         user = await _get_or_create_user(db, update)
-        if user.is_verified:
-            await db.commit()
-            return user, True, False
-
-        if password is not None and _password_matches(password):
-            user.is_verified = True
-            await db.commit()
-            return user, True, True
-
-        # Commit a newly created unverified user so it has a stable access state.
         await db.commit()
-        return user, False, False
+        return user
 
 
 @handle_errors()
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user, is_verified, _ = await _authorize_user(update)
-    if not is_verified:
-        await telegram_service.send_message(update.effective_chat.id, ACCESS_PASSWORD_PROMPT)
-        return
+    user = await _get_or_create_current_user(update)
 
     async with AsyncSessionLocal() as db:
         user = await db.get(User, user.id)
@@ -119,18 +94,7 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     text = update.message.text
     chat_id = update.effective_chat.id
 
-    user, is_verified, just_verified = await _authorize_user(update, password=text)
-    if not is_verified:
-        await telegram_service.send_message(chat_id, ACCESS_DENIED_PROMPT)
-        return
-
-    if just_verified:
-        async with AsyncSessionLocal() as db:
-            user = await db.get(User, user.id)
-            reply, _ = await run_onboarding(db, user, incoming_text="")
-            await db.commit()
-        await telegram_service.send_message(chat_id, f"Access verified.\n\n{reply}")
-        return
+    user = await _get_or_create_current_user(update)
 
     status_message = await telegram_service.send_status(
     chat_id,
@@ -180,10 +144,7 @@ async def document_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    user, is_verified, _ = await _authorize_user(update)
-    if not is_verified:
-        await telegram_service.send_message(update.effective_chat.id, ACCESS_PASSWORD_PROMPT)
-        return
+    user = await _get_or_create_current_user(update)
 
     doc = update.message.document
     filename = doc.file_name or "uploaded document"
@@ -262,10 +223,7 @@ async def photo_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    user, is_verified, _ = await _authorize_user(update)
-    if not is_verified:
-        await telegram_service.send_message(update.effective_chat.id, ACCESS_PASSWORD_PROMPT)
-        return
+    user = await _get_or_create_current_user(update)
 
     photo = update.message.photo[-1]
 
@@ -329,10 +287,7 @@ async def voice_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    user, is_verified, _ = await _authorize_user(update)
-    if not is_verified:
-        await telegram_service.send_message(update.effective_chat.id, ACCESS_PASSWORD_PROMPT)
-        return
+    user = await _get_or_create_current_user(update)
 
     voice = update.message.voice
 
