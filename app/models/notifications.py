@@ -19,6 +19,8 @@ class NotificationPreference(Base):
     daily_briefing_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     briefing_time: Mapped[time] = mapped_column(Time, default=time(8, 0))
     timezone: Mapped[str] = mapped_column(String, default="Asia/Kolkata")
+    last_briefing_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_briefing_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -39,7 +41,9 @@ class CustomAlert(Base):
     # structured condition once parsed by the agent, e.g. {"symbol": "TSLA", "type": "price_drop_pct", "value": 5}
     condition: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="custom_alerts")
+

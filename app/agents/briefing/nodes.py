@@ -1,3 +1,4 @@
+import asyncio
 from app.agents.briefing.prompts import BRIEFING_SYSTEM_PROMPT
 from app.agents.briefing.state import BriefingState
 from app.services.llm_service import get_chat_llm
@@ -21,25 +22,29 @@ async def gather_data_node(state: BriefingState) -> BriefingState:
         if symbol and symbol not in symbols:
             symbols.append(symbol)
 
-    # Fetch company data
-    for symbol in symbols:
+    # Fetch company data concurrently
+    async def _fetch_symbol_data(sym: str) -> str:
         try:
-            quote = await finnhub_client.get_quote(symbol)
-
-            news = await finnhub_client.get_company_news(
-                symbol,
-                limit=2,
-            )
-
-            chunks.append(
-                f"{symbol}: {quote}\n"
-                f"{news}"
-            )
-
+            quote_task = finnhub_client.get_quote(sym)
+            news_task = finnhub_client.get_company_news(sym, limit=2)
+            quote, news = await asyncio.gather(quote_task, news_task, return_exceptions=True)
+            quote_str = quote if isinstance(quote, str) else f"{sym}: Quote unavailable."
+            news_str = news if isinstance(news, str) else ""
+            return f"{sym}: {quote_str}\n{news_str}".strip()
         except Exception:
-            chunks.append(
-                f"{symbol}: Unable to fetch current data."
-            )
+            return f"{sym}: Unable to fetch current data."
+
+    if symbols:
+        symbol_results = await asyncio.gather(
+            *[_fetch_symbol_data(s) for s in symbols],
+            return_exceptions=True,
+        )
+        for res in symbol_results:
+            if isinstance(res, str) and res:
+                chunks.append(res)
+            elif isinstance(res, Exception):
+                chunks.append("Market data fetch encountered an error.")
+
 
     # 3. Followed markets
     # Keep this separate because markets may not be valid

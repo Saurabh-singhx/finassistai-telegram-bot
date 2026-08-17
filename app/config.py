@@ -39,9 +39,19 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str | None = None
     GOOGLE_REDIRECT_URI: str | None = None
 
-    # Scheduler
+    # Scheduler & Background Jobs
+    SCHEDULER_ENABLED: bool = True
     DEFAULT_BRIEFING_TIME: str = "08:00"
     DEFAULT_TIMEZONE: str = "Asia/Kolkata"
+    BRIEFING_JOB_INTERVAL_MINUTES: int = 1
+    BRIEFING_CONCURRENCY_LIMIT: int = 10
+    BRIEFING_TIMEOUT_SECONDS: int = 60
+    BRIEFING_DISPATCH_WINDOW_MINUTES: int = 120
+    BRIEFING_BATCH_SIZE: int = 100
+    ALERTS_JOB_ENABLED: bool = True
+    ALERTS_JOB_INTERVAL_MINUTES: int = 5
+    ALERTS_CONCURRENCY_LIMIT: int = 10
+    ALERTS_TIMEOUT_SECONDS: int = 30
 
 
 @lru_cache

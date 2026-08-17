@@ -29,3 +29,17 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(
+            text(
+                "ALTER TABLE notification_preferences "
+                "ADD COLUMN IF NOT EXISTS last_briefing_sent_at TIMESTAMPTZ, "
+                "ADD COLUMN IF NOT EXISTS last_briefing_date VARCHAR(10);"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE custom_alerts "
+                "ADD COLUMN IF NOT EXISTS last_triggered_at TIMESTAMPTZ;"
+            )
+        )
+

@@ -145,7 +145,7 @@ Use Alembic for schema changes in deployed environments. For a fresh development
 
 ## Operational notes
 
-- The daily briefing scheduler polls eligible users once per minute. It is suitable for a modest user base; move to per-user jobs or a queue as usage grows.
+- Background jobs include a bounded-concurrency Daily Briefing poller and a batch-deduplicated Custom Price Alert checker. Daily briefings use idempotency tracking per calendar date, batch watchlist queries to eliminate N+1 DB loads, isolated short-lived transactions, and timeouts per user.
 - OAuth access and refresh tokens are stored in the user record. Use encrypted storage/column encryption and restrict database access before production use.
 - Never commit `.env`, OAuth client secrets, bot tokens, or database credentials.
 - SEC EDGAR requires a descriptive `User-Agent` containing a real contact address.

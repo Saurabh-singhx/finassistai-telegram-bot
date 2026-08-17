@@ -1,7 +1,8 @@
+import asyncio
 import logging
 
 from telegram import Bot
-from telegram.error import TelegramError
+from telegram.error import BadRequest, Forbidden, RetryAfter, TelegramError
 
 from app.config import settings
 
@@ -23,12 +24,54 @@ def get_bot() -> Bot:
     return _bot
 
 
-async def send_message(chat_id: int, text: str) -> None:
+async def send_message(chat_id: int, text: str, max_retries: int = 2) -> bool:
     """Send an LLM reply without handing untrusted text to Telegram's parser."""
     bot = get_bot()
+    chunks = _split_message(text)
+    if not chunks:
+        return True
 
-    for chunk in _split_message(text):
-        await bot.send_message(chat_id=chat_id, text=chunk)
+    for chunk in chunks:
+        attempts = 0
+        while True:
+            try:
+                await bot.send_message(chat_id=chat_id, text=chunk)
+                break
+            except RetryAfter as exc:
+                attempts += 1
+                wait_time = float(exc.retry_after) + 0.5
+                logger.warning(
+                    "Telegram rate limit hit for chat %s. Retrying in %.2fs (attempt %d/%d)",
+                    chat_id,
+                    wait_time,
+                    attempts,
+                    max_retries,
+                )
+                if attempts > max_retries:
+                    logger.error("Exceeded max retries for chat %s due to rate limiting", chat_id)
+                    return False
+                await asyncio.sleep(wait_time)
+            except Forbidden as exc:
+                logger.warning("Telegram bot forbidden/blocked for chat %s: %s", chat_id, exc)
+                return False
+            except BadRequest as exc:
+                logger.warning("Telegram BadRequest for chat %s: %s", chat_id, exc)
+                return False
+            except TelegramError as exc:
+                attempts += 1
+                logger.warning(
+                    "Telegram error sending to chat %s: %s (attempt %d/%d)",
+                    chat_id,
+                    exc,
+                    attempts,
+                    max_retries,
+                )
+                if attempts > max_retries:
+                    raise
+                await asyncio.sleep(1.0)
+
+    return True
+
 
 
 def _split_message(text: str) -> list[str]:

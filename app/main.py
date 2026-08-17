@@ -11,7 +11,7 @@ from app.bot.router import register_handlers
 from app.config import settings
 from app.core.logging import setup_logging
 from app.database import init_db
-from app.jobs.scheduler import start_scheduler, stop_scheduler
+from app.jobs.scheduler import get_scheduler_status, start_scheduler, stop_scheduler
 from app.api.v1.google_auth import router as google_auth_router
 setup_logging()
 logger = logging.getLogger("finassist.main")
@@ -108,4 +108,10 @@ async def telegram_webhook(request: Request):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "app": settings.APP_NAME, "env": settings.ENV}
+    return {
+        "status": "ok",
+        "app": settings.APP_NAME,
+        "env": settings.ENV,
+        "scheduler": get_scheduler_status(),
+    }
+
