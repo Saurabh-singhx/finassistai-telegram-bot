@@ -172,12 +172,12 @@ async def document_handler(
         )
         return
 
-    thread_id = await get_or_create_thread_id(
-        db,
-        user.id,
-    )
-
     async with AsyncSessionLocal() as db:
+        thread_id = await get_or_create_thread_id(
+            db,
+            user.id,
+        )
+
         # Save the uploaded file as a user message
         await memory_service.log_message(
             db,
@@ -238,12 +238,12 @@ async def photo_handler(
         )
         return
 
-    thread_id = await get_or_create_thread_id(
+    async with AsyncSessionLocal() as db:
+        thread_id = await get_or_create_thread_id(
             db,
             user.id,
         )
 
-    async with AsyncSessionLocal() as db:
         # Save the image upload as a user message
         await memory_service.log_message(
             db,
@@ -302,12 +302,12 @@ async def voice_handler(
         )
         return
 
-    thread_id = await get_or_create_thread_id(
-        db,
-        user.id,
-    )
-
     async with AsyncSessionLocal() as db:
+        thread_id = await get_or_create_thread_id(
+            db,
+            user.id,
+        )
+
         # Save the transcribed voice message as the user's message
         await memory_service.log_message(
             db,
