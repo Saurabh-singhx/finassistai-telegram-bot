@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.documents import Document
 from app.services.llm_service import embed_query, embed_text
 from google import genai
+from google.genai import types
 
 client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
@@ -61,42 +62,32 @@ async def extract_image_text(
     file_bytes: bytes,
     mime_type: str = "image/jpeg",
 ) -> str:
-    response = client.models.generate_content(
+    response = await client.aio.models.generate_content(
         model=settings.LLM_MODEL,
         contents=[
-            {
-                "inline_data": {
-                    "mime_type": mime_type,
-                    "data": file_bytes,
-                }
-            },
+            types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
             "Transcribe any text visible in this image. "
             "If it's a chart or table, describe the key data points plainly."
             "reply with only the extracted text, nothing else.",
         ],
     )
 
-    return response.text
+    return response.text or ""
 
 
 async def transcribe_voice(
     file_bytes: bytes,
     mime_type: str = "audio/ogg",
 ) -> str:
-    response = client.models.generate_content(
+    response = await client.aio.models.generate_content(
         model=settings.LLM_MODEL,
         contents=[
-            {
-                "inline_data": {
-                    "mime_type": mime_type,
-                    "data": file_bytes,
-                }
-            },
+            types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
             "Transcribe this audio to plain text, nothing else.",
         ],
     )
 
-    return response.text
+    return response.text or ""
 
 async def extract_pdf_text(file_bytes: bytes) -> str:
     """Extracts text from a PDF. For pages with no text layer (scanned pages),

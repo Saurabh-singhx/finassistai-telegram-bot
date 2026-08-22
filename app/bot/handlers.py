@@ -144,142 +144,173 @@ async def document_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
+    chat_id = update.effective_chat.id
     user = await _get_or_create_current_user(update)
 
     doc = update.message.document
+    if not doc:
+        return
+
     filename = doc.file_name or "uploaded document"
     if doc.file_size and doc.file_size > MAX_UPLOAD_BYTES:
         await telegram_service.send_message(
-            update.effective_chat.id,
+            chat_id,
             "That file is too large to process. Please upload a file smaller than 20 MB.",
         )
         return
 
-    file = await context.bot.get_file(doc.file_id)
-    file_bytes = bytes(await file.download_as_bytearray())
+    status_message = await telegram_service.send_status(
+        chat_id,
+        "📄 Processing document...",
+    )
+    status_message_id = status_message.message_id
 
-    if filename.lower().endswith(".pdf"):
-        text = await rag_service.extract_pdf_text(file_bytes)
-        source_type = "pdf"
-    else:
-        text = file_bytes.decode("utf-8", errors="ignore")
-        source_type = "document"
+    try:
+        file = await context.bot.get_file(doc.file_id)
+        file_bytes = bytes(await file.download_as_bytearray())
 
-    if not text.strip():
+        if filename.lower().endswith(".pdf"):
+            text = await rag_service.extract_pdf_text(file_bytes)
+            source_type = "pdf"
+        elif filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+            text = await rag_service.extract_image_text(file_bytes)
+            source_type = "image"
+        else:
+            text = file_bytes.decode("utf-8", errors="ignore")
+            source_type = "document"
+
+        if not text.strip():
+            await telegram_service.send_message(
+                chat_id,
+                "I couldn't extract readable text from that file. Try a text-based PDF or document.",
+            )
+            return
+
+        async with AsyncSessionLocal() as db:
+            thread_id = await get_or_create_thread_id(
+                db,
+                user.id,
+            )
+
+            # Save the uploaded file as a user message
+            await memory_service.log_message(
+                db,
+                user.id,
+                str(thread_id),
+                "user",
+                f"[File uploaded] {filename}",
+                message_type="document",
+            )
+
+            # Extracted text is split into chunks and indexed for RAG
+            n_chunks = await rag_service.ingest_document(
+                db,
+                user.id,
+                text,
+                source_type,
+                filename=filename,
+            )
+
+            reply = (
+                f"Read through {filename} "
+                f"({n_chunks} sections indexed). "
+                "Ask me anything about it."
+            )
+
+            # Save the bot's response as an assistant message
+            await memory_service.log_message(
+                db,
+                user.id,
+                str(thread_id),
+                "assistant",
+                reply,
+            )
+
+            await db.commit()
+
         await telegram_service.send_message(
-            update.effective_chat.id,
-            "I couldn't extract readable text from that file. Try a text-based PDF or document.",
-        )
-        return
-
-    async with AsyncSessionLocal() as db:
-        thread_id = await get_or_create_thread_id(
-            db,
-            user.id,
-        )
-
-        # Save the uploaded file as a user message
-        await memory_service.log_message(
-            db,
-            user.id,
-            str(thread_id),
-            "user",
-            f"[File uploaded] {filename}",
-        )
-
-        # Extracted text is split into chunks and indexed for RAG
-        n_chunks = await rag_service.ingest_document(
-            db,
-            user.id,
-            text,
-            source_type,
-            filename=filename,
-        )
-
-        reply = (
-            f"Read through {filename} "
-            f"({n_chunks} sections indexed). "
-            "Ask me anything about it."
-        )
-
-        # Save the bot's response as an assistant message
-        await memory_service.log_message(
-            db,
-            user.id,
-            str(thread_id),
-            "assistant",
+            chat_id,
             reply,
         )
+    finally:
+        await delete_status(chat_id, status_message_id)
 
-        await db.commit()
-
-    await telegram_service.send_message(
-        update.effective_chat.id,
-        reply,
-    )
 
 @handle_errors()
 async def photo_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
+    chat_id = update.effective_chat.id
     user = await _get_or_create_current_user(update)
+
+    if not update.message.photo:
+        return
 
     photo = update.message.photo[-1]
 
-    file = await context.bot.get_file(photo.file_id)
-    file_bytes = bytes(await file.download_as_bytearray())
+    status_message = await telegram_service.send_status(
+        chat_id,
+        "🖼 Processing image...",
+    )
+    status_message_id = status_message.message_id
 
-    extracted = await rag_service.extract_image_text(file_bytes)
-    if not extracted or not extracted.strip():
+    try:
+        file = await context.bot.get_file(photo.file_id)
+        file_bytes = bytes(await file.download_as_bytearray())
+
+        extracted = await rag_service.extract_image_text(file_bytes)
+        if not extracted or not extracted.strip():
+            await telegram_service.send_message(
+                chat_id,
+                "I couldn't read any text or data from that image. Please try a clearer image.",
+            )
+            return
+
+        async with AsyncSessionLocal() as db:
+            thread_id = await get_or_create_thread_id(
+                db,
+                user.id,
+            )
+
+            # Save the image upload as a user message
+            await memory_service.log_message(
+                db,
+                user.id,
+                str(thread_id),
+                "user",
+                "[Image uploaded]",
+                message_type="image",
+            )
+
+            # Index the extracted image content for RAG
+            await rag_service.ingest_document(
+                db,
+                user.id,
+                extracted,
+                source_type="image",
+                filename="photo",
+            )
+
+            reply = extracted
+
+            # Save the bot's response
+            await memory_service.log_message(
+                db,
+                user.id,
+                str(thread_id),
+                "assistant",
+                reply,
+            )
+
+            await db.commit()
+
         await telegram_service.send_message(
-            update.effective_chat.id,
-            "I couldn't read any text or data from that image. Please try a clearer image.",
-        )
-        return
-
-    async with AsyncSessionLocal() as db:
-        thread_id = await get_or_create_thread_id(
-            db,
-            user.id,
-        )
-
-        # Save the image upload as a user message
-        await memory_service.log_message(
-            db,
-            user.id,
-            str(thread_id),
-            "user",
-            "[Image uploaded]",
-            message_type="image",
-        )
-
-        # Index the extracted image content for RAG
-        await rag_service.ingest_document(
-            db,
-            user.id,
-            extracted,
-            source_type="image",
-            filename="photo",
-        )
-
-        reply = extracted
-
-        # Save the bot's response
-        await memory_service.log_message(
-            db,
-            user.id,
-            str(thread_id),
-            "assistant",
+            chat_id,
             reply,
         )
-
-        await db.commit()
-
-    await telegram_service.send_message(
-        update.effective_chat.id,
-        reply,
-    )
+    finally:
+        await delete_status(chat_id, status_message_id)
 
 
 @handle_errors()
@@ -287,50 +318,61 @@ async def voice_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
+    chat_id = update.effective_chat.id
     user = await _get_or_create_current_user(update)
 
     voice = update.message.voice
-
-    file = await context.bot.get_file(voice.file_id)
-    file_bytes = bytes(await file.download_as_bytearray())
-
-    transcript = await rag_service.transcribe_voice(file_bytes)
-    if not transcript or not transcript.strip():
-        await telegram_service.send_message(
-            update.effective_chat.id,
-            "I couldn't transcribe that voice message. Please try sending it again.",
-        )
+    if not voice:
         return
 
-    async with AsyncSessionLocal() as db:
-        thread_id = await get_or_create_thread_id(
-            db,
-            user.id,
-        )
-
-        # Save the transcribed voice message as the user's message
-        await memory_service.log_message(
-            db,
-            user.id,
-            str(thread_id),
-            "user",
-            transcript,
-            message_type="voice",
-        )
-
-        user_context = await memory_service.get_user_context(
-            db,
-            user.id,
-        )
-
-        await db.commit()
-
-    chat_id = update.effective_chat.id
     status_message = await telegram_service.send_status(
-        chat_id, "🔎 Working on your voice message..."
+        chat_id,
+        "🔎 Working on your voice message...",
     )
+    status_message_id = status_message.message_id
 
     try:
+        file = await context.bot.get_file(voice.file_id)
+        file_bytes = bytes(await file.download_as_bytearray())
+
+        transcript = await rag_service.transcribe_voice(file_bytes)
+        if not transcript or not transcript.strip():
+            await telegram_service.send_message(
+                chat_id,
+                "I couldn't transcribe that voice message. Please try sending it again.",
+            )
+            return
+
+        async with AsyncSessionLocal() as db:
+            user = await db.get(User, user.id)
+            if not _onboarding_complete(user):
+                reply, _ = await run_onboarding(db, user, incoming_text=transcript)
+                await db.commit()
+                await telegram_service.send_message(chat_id, reply)
+                return
+
+            thread_id = await get_or_create_thread_id(
+                db,
+                user.id,
+            )
+
+            # Save the transcribed voice message as the user's message
+            await memory_service.log_message(
+                db,
+                user.id,
+                str(thread_id),
+                "user",
+                transcript,
+                message_type="voice",
+            )
+
+            user_context = await memory_service.get_user_context(
+                db,
+                user.id,
+            )
+
+            await db.commit()
+
         # Let the normal chat agent process the transcription.
         reply = await run_chat_turn(
             user_id=str(user.id),
@@ -338,7 +380,7 @@ async def voice_handler(
             user_context=user_context,
             user_text=transcript,
             chat_id=chat_id,
-            status_message_id=status_message.message_id,
+            status_message_id=status_message_id,
         )
 
         async with AsyncSessionLocal() as db:
@@ -353,4 +395,4 @@ async def voice_handler(
 
         await telegram_service.send_message(chat_id, reply)
     finally:
-        await delete_status(chat_id, status_message.message_id)
+        await delete_status(chat_id, status_message_id)
